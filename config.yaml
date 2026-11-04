@@ -1,0 +1,112 @@
+# =============================================================================
+# Reference configuration of the reported experiments.
+# IMPORTANT: this file DOCUMENTS the settings. The notebook reads its settings
+# from the `CFG` class in Cell 0.0 (single source of truth). If you change a
+# value here, change the same value in Cell 0.0 as well.
+# =============================================================================
+title: "Leakage-Controlled Benchmarking of Evidential Multitask Learning for Bitter Gourd Leaf Disease Recognition and Severity Grading"
+notebook: first-paper-final-code.ipynb
+
+environment:
+  platform: Kaggle Notebook
+  accelerator: NVIDIA Tesla T4
+  python: "3.12.13"
+  mixed_precision: fp16 (torch.amp autocast + GradScaler)
+  total_runtime_hours: 10.9        # papermill duration: 39199 s
+
+data:
+  kaggle_dataset: ranjit2027/bitter-gourd-dataset
+  classes: [Anthracnose, Downey mildew, Fresh leaf, Fusarium wilt, Mosaic virus]
+  expected_counts: {Anthracnose: 410, "Downey mildew": 570, "Fresh leaf": 551, "Fusarium wilt": 502, "Mosaic virus": 600}
+  total_images: 2633
+  images_after_dedup: 2439
+  severity_levels: [Mild, Moderate, Severe]
+
+severity_labels:                    # Step 0A, HSV-based lesion-area ratio
+  seg_size: 448
+  hsv_low: [32, 20, 40]             # recalibrated in Cells 0.3-QC/GRID/FIX
+  hsv_high: [85, 255, 255]
+  morph_k: 5
+  leaf_close_k: 21
+  lesion_open_k: 5
+  default_bounds: [0.05, 0.25]      # Mild < 0.05 <= Moderate < 0.25 <= Severe
+  fallback: data-driven tertiles if any grade holds < 10% of diseased images
+  # the bounds actually used are printed by Cell 0.3-FIX (CFG.SEV_BOUNDS_USED)
+
+preprocessing:
+  clahe: {clip_limit: 2.0, tile_grid: [8, 8], channel: "L of LAB", cached_offline: true}
+  cache_size: 448
+  jpeg_quality: 98
+  normalisation: {mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225]}
+  train_augmentation:
+    random_resized_crop: {scale: [0.65, 1.0], ratio: [0.85, 1.15]}
+    horizontal_flip: 0.5
+    vertical_flip: 0.5
+    rotate: {limit: 30, p: 0.5}
+    color_jitter: {brightness: 0.25, contrast: 0.25, saturation: 0.25, hue: 0.02, p: 0.6}
+
+leakage_control:
+  near_duplicate_removal: perceptual hash (flip/rotation-invariant), within class
+  phash_hamming_threshold: 4
+  folds: 5
+  split: stratified k-fold
+  val_fraction_of_train: 0.10      # early stopping only
+
+seeds:
+  split_seed: 42
+  training_seeds: [42, 123, 2024]
+  robustness_seed: 1234
+  per_run_seed: "seed * 100 + fold"
+
+optimisation:
+  optimizer: AdamW
+  betas: [0.9, 0.999]
+  lr: 1.0e-4
+  head_lr_multiplier: 10.0
+  weight_decay: 0.05
+  grad_clip: 1.0
+  schedule: warmup + cosine
+  warmup_epochs: 2
+  max_epochs: 30
+  early_stopping_patience: 10
+  head_dropout: 0.3
+  num_workers: 4
+  checkpoints: none               # best weights restored in RAM only
+
+loss:
+  focal_gamma: 2.0
+  label_smoothing: 0.05
+  class_weighting: inverse frequency
+  lambda_ordinal: 0.5             # CORAL severity loss weight
+  edl_weight: 1.0
+  edl_anneal_epochs: 10
+
+uncertainty:
+  abstain_uncertainty: 0.30
+  abstain_confidence: 0.60
+  abstain_rates: [0.0, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50]
+  ece_bins: 15
+
+robustness:                       # 5 severity levels each
+  lighting: [0.75, 0.55, 0.40, 0.25, 0.15]
+  blur: [1.0, 2.0, 3.0, 4.0, 6.0]
+  noise: [0.02, 0.05, 0.08, 0.12, 0.18]
+  occlusion: [0.05, 0.10, 0.20, 0.30, 0.40]
+
+xai:
+  method: Grad-CAM
+  faithfulness_metric: Insertion AUC
+  n_images: 16
+  steps: 20
+  blur_sigma: 10.0
+
+models:                           # timm, ImageNet-pretrained
+  proposed: {name: BG-EDLNet-ConvNeXt, backbone: convnext_tiny, img: 224, batch: 32, evidential: true, severity_head: true, drop_path: 0.1}
+  secondary: {name: BG-EDLNet-Swin, backbone: swin_tiny_patch4_window7_224, img: 384, batch: 16, evidential: true, severity_head: true}
+  ablations:
+    - {name: Abl-noEDL, backbone: convnext_tiny, evidential: false, severity_head: true}
+    - {name: Abl-noSeverity, backbone: convnext_tiny, evidential: true, severity_head: false}
+    - {name: ConvNeXt-plain, backbone: convnext_tiny, evidential: false, severity_head: false}
+  baselines: [resnet50, mobilenetv3_large_100, efficientnet_b0, vgg16, densenet121]
+
+statistics: [mean ± 95% CI over folds, Wilcoxon signed-rank, McNemar]

@@ -1,0 +1,16 @@
+# Environment used for the reported experiments (Kaggle notebook, Python 3.12.13).
+# Versions marked "==" were printed by the notebook at run time (Cell 0.1).
+torch==2.10.0
+torchvision            # install the build matching torch 2.10.0 (CUDA 12.8 wheels were used)
+timm==1.0.26
+opencv-python-headless>=4.13.0
+numpy==2.0.2
+albumentations==2.0.8
+scipy>=1.11
+scikit-learn>=1.4
+pandas>=2.0
+matplotlib>=3.8
+tqdm>=4.66
+safetensors>=0.4
+huggingface_hub>=0.23   # timm downloads ImageNet-pretrained weights from the Hugging Face Hub
+jupyter>=1.0            # only needed to run the notebook locally
