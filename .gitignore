@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Data and large outputs (archived on Zenodo, not in Git)
+data/
+dataset/
+Bitter Gourd/
+clahe_cache/
+working/
+reports/
+*.csv
+*.zip
+*.tar
+*.tar.gz
+
+# Model weights (none are stored for this study)
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Secrets
+.env
+kaggle.json
